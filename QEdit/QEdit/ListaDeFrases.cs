@@ -24,8 +24,18 @@ class ListaDeFrases
         return frases[numeroLinea];
     }
 
-    public void Añadir(string linea)
+    // Modifica la linea actual en la que estemos o añade la linea a la lista si
+    // la coordenada Y del cursor es mayor que el tamaño de la lista
+    public void Anyadir(string linea, int posicion)
     {
-        frases.Add(linea);
+        
+        if (posicion >= frases.Count)
+        {
+            frases.Add(linea);
+        }
+        else
+        {
+            frases[posicion] = linea;
+        }
     }
 }

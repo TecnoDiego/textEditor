@@ -43,6 +43,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Linea.cs" />
     <Compile Include="ListaDeFrases.cs" />
     <Compile Include="QEdit.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
