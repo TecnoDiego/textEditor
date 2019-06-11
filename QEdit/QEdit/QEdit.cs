@@ -52,77 +52,16 @@ class QEdit
         return fichero;
     }
 
-    public static void Guardar(string nombreFichero, ListaDeFrases frases)
-    {
-        try
-        {
-            StreamWriter fichero = new StreamWriter(nombreFichero);
-            for(int i = 0;i < frases.Cantidad; i++)
-            {
-                Console.WriteLine(frases.Get(i));
-                fichero.WriteLine(frases.Get(i));
-            }
-            fichero.Close();
-        }
-        catch (PathTooLongException)
-        {
-            Console.WriteLine("Ruta demasiado larga");
-        }
-        catch (FileNotFoundException)
-        {
-            Console.WriteLine("Fichero no encontrado");
-        }
-        catch(IOException io)
-        {
-            Console.WriteLine("Error de lectura/escritura: " + io.Message);
-        }
-        catch(Exception e)
-        {
-            Console.WriteLine(e.Message);
-        }
-    }
-
-    public static void Cargar(string nombreFichero, ListaDeFrases frases)
-    {
-        try
-        {
-            StreamReader fichero = new StreamReader(nombreFichero);
-            string linea = null;
-            do
-            {
-                linea = fichero.ReadLine();
-                if(linea != null)
-                {
-                    frases.Anyadir(linea, 0);
-                }
-            } while (linea != null);
-            fichero.Close();
-        }
-        catch (PathTooLongException)
-        {
-            Console.WriteLine("Ruta demasiado larga");
-        }
-        catch (FileNotFoundException)
-        {
-            Console.WriteLine("Fichero no encontrado");
-        }
-        catch (IOException io)
-        {
-            Console.WriteLine("Error de lectura/escritura: " + io.Message);
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine(e.Message);
-        }
-    }
-
     public static bool EsDibujable(ConsoleKey tecla)
     {
         // Teclas que se usan actualmente (de momento) pero que no queremos que se añadan a la cadena
         if(tecla == ConsoleKey.Enter || tecla == ConsoleKey.End ||
             tecla == ConsoleKey.Home || tecla == ConsoleKey.LeftArrow ||
             tecla == ConsoleKey.RightArrow || tecla == ConsoleKey.UpArrow ||
-            tecla == ConsoleKey.DownArrow || tecla == ConsoleKey.F10)
+            tecla == ConsoleKey.DownArrow || tecla == ConsoleKey.F10 ||
+            tecla == ConsoleKey.Insert || tecla == ConsoleKey.Delete || 
+            tecla == ConsoleKey.Backspace || tecla == ConsoleKey.PageDown ||
+            tecla == ConsoleKey.PageUp)
         {
             return false;
         }
@@ -131,29 +70,59 @@ class QEdit
             return true;
         }
     }
+    public static void ComprobarLongitudCadena(ref int columna, int fila, 
+        ListaDeFrases frases)
+    {
+        if (columna > frases.Get(fila - 1).Length)
+            columna = frases.Get(fila - 1).Length;
+    }
+
+    public static bool GuardarCambios()
+    {
+        ConsoleKeyInfo tecla;
+        bool guardar = false; ;
+        do
+        {
+            Console.Clear();
+            Console.WriteLine("¿Desea guardar los cambios?(s/n)");
+            tecla = Console.ReadKey(true);
+            
+            if(tecla.Key == ConsoleKey.S)
+            {
+                guardar = true;
+                Console.WriteLine("Guardando...");
+            }
+        } while (tecla.Key != ConsoleKey.S && tecla.Key != ConsoleKey.N);
+        return guardar;
+    }
 
     static void Main(string[] args)
     {
+        const int SALTO = 20;
+        const int ANCHO = 80;
+        const int ALTO = 25;
+        const int BUFFER = 1024;
         ListaDeFrases frases = new ListaDeFrases();
-        Console.SetBufferSize(1024, 1024);
-        Console.SetWindowSize(80, Console.WindowHeight);
+        Linea linea = new Linea();
+        Console.SetBufferSize(BUFFER, BUFFER);
+        Console.SetWindowSize(ANCHO, ALTO);
+        string nombreFichero = args.Length == 1 ? args[0] : "";
+
         Cursor cursor;
         cursor.x = 0;
         cursor.y = 1;
-        string nombreFichero = args.Length == 1? args[0] : "";
+        bool insercion = true;
         string primeraLinea;
-        Linea linea = new Linea();
-        
         bool salir = false;
         ConsoleKeyInfo tecla;
 
         if (File.Exists(nombreFichero))
-            Cargar(nombreFichero, frases);
-
+            frases.Cargar(nombreFichero);
+        linea.LineaActual = frases.Get(cursor.y - 1);
         do
         {
             primeraLinea = "Línea:" + cursor.y + " Columna:" + (cursor.x + 1) +
-                " Documento:" + nombreFichero;
+               (insercion? " INS" : " SOB") + " Documento:" + nombreFichero;
 
             DibujarPrimeraLinea(primeraLinea);
             DibujarTexto(frases);
@@ -162,19 +131,33 @@ class QEdit
             Console.SetCursorPosition(cursor.x, cursor.y);
             tecla = Console.ReadKey(true);
 
+            if (tecla.Key == ConsoleKey.Insert)
+                insercion = !insercion;
+
             if (EsDibujable(tecla.Key))
             {
-                linea.Insertar(cursor.x, tecla.KeyChar);
+                linea.Insertar(cursor.x, tecla.KeyChar, insercion);
+                
                 cursor.x++;
-            } 
+            }
             frases.Anyadir(linea.LineaActual, cursor.y - 1);
-            
+
             // TO DO Encapsular en funciones
             if (tecla.Key == ConsoleKey.Enter)
             {
                 cursor.x = 0;
-                linea.LineaActual = "";
+                linea.LineaActual = frases.Get(cursor.y);
                 cursor.y++;
+            }
+            else if (tecla.Key == ConsoleKey.Backspace)
+            {
+                linea.Borrar(cursor.x);
+                if (cursor.x > 0)
+                    cursor.x--;
+            }
+            else if (tecla.Key == ConsoleKey.Delete)
+            {
+                linea.Suprimir(cursor.x);
             }
             else if (tecla.Key == ConsoleKey.Home)
             {
@@ -200,8 +183,7 @@ class QEdit
                 {
                     cursor.y--;
                     linea.LineaActual = frases.Get(cursor.y - 1);
-                    if (cursor.x > frases.Get(cursor.y - 1).Length)
-                        cursor.x = frases.Get(cursor.y - 1).Length;
+                    ComprobarLongitudCadena(ref cursor.x, cursor.y, frases);
                 }
             }
             else if (tecla.Key == ConsoleKey.DownArrow)
@@ -210,9 +192,35 @@ class QEdit
                 {
                     cursor.y++;
                     linea.LineaActual = frases.Get(cursor.y - 1);
-                    if (cursor.x > frases.Get(cursor.y - 1).Length)
-                        cursor.x = frases.Get(cursor.y - 1).Length;
+                    ComprobarLongitudCadena(ref cursor.x, cursor.y, frases);
                 }
+            }
+            else if(tecla.Key == ConsoleKey.PageDown)
+            {
+                if (cursor.y + SALTO > frases.Cantidad)
+                {
+                    cursor.y = frases.Cantidad;
+                }
+                else
+                {
+                    cursor.y += 20;
+                }
+                linea.LineaActual = frases.Get(cursor.y - 1);
+                ComprobarLongitudCadena(ref cursor.x, cursor.y, frases);
+            }
+            else if (tecla.Key == ConsoleKey.PageUp)
+            {
+                
+                if (cursor.y - SALTO < 1)
+                {
+                    cursor.y = 1;
+                }
+                else
+                {
+                    cursor.y -= SALTO;
+                }
+                linea.LineaActual = frases.Get(cursor.y - 1);
+                ComprobarLongitudCadena(ref cursor.x, cursor.y, frases);
             }
             else if (tecla.Key == ConsoleKey.F10)
             {
@@ -223,10 +231,12 @@ class QEdit
         } while (!salir);
         Console.WriteLine();
 
-        if(nombreFichero == "")
-            nombreFichero = PedirNombreFichero();
-
+        if(GuardarCambios())
+        {
+            if(nombreFichero == "")
+                nombreFichero = PedirNombreFichero();
+            frases.Guardar(nombreFichero);
+        }
         Console.WriteLine();
-        Guardar(nombreFichero, frases);
     }
 }
